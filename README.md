@@ -10,6 +10,7 @@ This project aims to improve the performance of one CMS pitcher by analyzing and
 
 ## 📁 Folder Structure
 
+- https://docs.google.com/spreadsheets/d/1CYC2a_0xZq0JjAGIgEsJkQF2JLR556PnyWzf6pf6arw/edit?gid=1553641275#gid=1553641275: Google Sheet with Raw Data
 - `/data/`: Google Sheet exports and raw pitch metric CSVs  
 - `/scripts/`: R Markdown notebooks for modeling & visualizing pitch data  
 - `README.md`: This file  
