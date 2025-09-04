@@ -3,3 +3,17 @@ title: "in_game_performance"
 output: html_document
 ---
 
+```{r}
+source("scripts/cleaning.R")
+source("scripts/plotting.R")
+library(here)
+
+# load test dataset
+rapsodo <- clean_rapsodo(here("data", "test_rapsodo.csv"))
+
+# make plots
+plot_movement(rapsodo)
+plot_release(rapsodo)
+plot_spin_profile(rapsodo)
+
+```
