@@ -88,14 +88,25 @@ plot_pitch_usage <- function(data) {
 plot_fsfb_whiff_heatmap <- function(data) {
   library(dplyr)
   library(ggplot2)
+  library(tidyr)
   
-  # filter for fastballs only
+  # Define bin edges
+  x_bins <- seq(-2, 2, by = 0.5)
+  y_bins <- seq(0, 5, by = 0.5)
+  
+  # Full grid
+  grid <- expand.grid(
+    SideMid = head(x_bins, -1) + diff(x_bins)/2,
+    HeightMid = head(y_bins, -1) + diff(y_bins)/2
+  )
+  
+  # Summarize pitch data
   fsfb <- data %>%
     filter(PitchType == "Fastball") %>%
     mutate(
       WhiffFlag = ifelse(PitchOutcome == "Whiff", 1, 0),
-      SideBin = cut(`Strike Zone Side`, breaks = seq(-25, 25, by = 5)),
-      HeightBin = cut(`Strike Zone Height`, breaks = seq(0, 60, by = 5))
+      SideBin = cut(`Strike Zone Side`, breaks = x_bins, include.lowest = TRUE),
+      HeightBin = cut(`Strike Zone Height`, breaks = y_bins, include.lowest = TRUE)
     ) %>%
     group_by(SideBin, HeightBin) %>%
     summarise(
@@ -103,19 +114,40 @@ plot_fsfb_whiff_heatmap <- function(data) {
       whiffs = sum(WhiffFlag, na.rm = TRUE),
       whiff_rate = whiffs / pitches,
       .groups = "drop"
-    )
+    ) %>%
+    mutate(
+      SideMid = (as.numeric(sub("\\((.+),.*", "\\1", SideBin)) + 
+                   as.numeric(sub("[^,]*,([^]]*)\\]", "\\1", SideBin)))/2,
+      HeightMid = (as.numeric(sub("\\((.+),.*", "\\1", HeightBin)) + 
+                     as.numeric(sub("[^,]*,([^]]*)\\]", "\\1", HeightBin)))/2
+    ) %>%
+    select(SideMid, HeightMid, whiff_rate, pitches)
   
-  print(fsfb)  # 👈 print table to debug what’s going into the plot
+  # Join grid + keep NA for empty bins
+  fsfb_full <- grid %>%
+    left_join(fsfb, by = c("SideMid", "HeightMid"))
   
-  ggplot(fsfb, aes(x = SideBin, y = HeightBin, fill = whiff_rate)) +
-    geom_tile(color = "white") +
-    scale_fill_viridis_c(labels = scales::percent, option = "C") +
+  # Plot
+  ggplot(fsfb_full, aes(x = SideMid, y = HeightMid)) +
+    geom_tile(aes(fill = whiff_rate), color = "white") +
+    geom_text(aes(label = ifelse(!is.na(whiff_rate),
+                                 paste0(round(whiff_rate*100), "%"), "")),
+              size = 3, color = "black") +
+    scale_fill_gradient2(
+      low = "red", mid = "white", high = "blue",
+      midpoint = 0.5, limits = c(0,1),
+      labels = scales::percent,
+      na.value = "grey90"
+    ) +
     labs(
       title = "4-Seam Fastball Whiff Rate by Location",
-      x = "Strike Zone Side",
-      y = "Strike Zone Height",
-      fill = "Whiff Rate"
+      x = "Horizontal Location (ft.)",
+      y = "Vertical Location (ft.)",
+      fill = "Whiff %"
     ) +
-    theme_minimal(base_size = 14)
+    coord_fixed(ratio = 1, xlim = c(-2, 2), ylim = c(0, 5)) +
+    theme_minimal(base_size = 14) +
+    theme(panel.grid = element_blank()) +
+    annotate("rect", xmin = -0.83, xmax = 0.83, ymin = 1.5, ymax = 3.5,
+             color = "green", fill = NA, size = 1)
 }
-
