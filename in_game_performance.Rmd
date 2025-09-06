@@ -15,5 +15,6 @@ rapsodo <- clean_rapsodo(here("data", "test_rapsodo.csv"))
 plot_movement(rapsodo)
 plot_release(rapsodo)
 plot_spin_profile(rapsodo)
-
+plot_pitch_usage(rapsodo)
+plot_fsfb_whiff_heatmap(rapsodo)
 ```

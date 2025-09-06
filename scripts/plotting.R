@@ -61,3 +61,61 @@ plot_spin_profile <- function(df) {
     theme_minimal() +
     labs(title = "Velocity vs Spin Rate", x = "Velocity (mph)", y = "Spin Rate (rpm)")
 }
+
+# Pitch usage
+plot_pitch_usage <- function(data) {
+  library(ggplot2)
+  library(dplyr)
+  
+  usage <- data %>%
+    group_by(PitchType) %>%
+    summarise(count = n(), .groups = "drop") %>%
+    mutate(pct = count / sum(count) * 100)
+  
+  ggplot(usage, aes(x = reorder(PitchType, -pct), y = pct, fill = PitchType)) +
+    geom_col() +
+    geom_text(aes(label = paste0(round(pct, 1), "%")), vjust = -0.5) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none") +
+    labs(
+      title = "Pitch Usage",
+      x = "Pitch Type",
+      y = "Usage (%)"
+    )
+}
+
+# Whiff % by location 4SFB
+plot_fsfb_whiff_heatmap <- function(data) {
+  library(dplyr)
+  library(ggplot2)
+  
+  # filter for fastballs only
+  fsfb <- data %>%
+    filter(PitchType == "Fastball") %>%
+    mutate(
+      WhiffFlag = ifelse(PitchOutcome == "Whiff", 1, 0),
+      SideBin = cut(`Strike Zone Side`, breaks = seq(-25, 25, by = 5)),
+      HeightBin = cut(`Strike Zone Height`, breaks = seq(0, 60, by = 5))
+    ) %>%
+    group_by(SideBin, HeightBin) %>%
+    summarise(
+      pitches = n(),
+      whiffs = sum(WhiffFlag, na.rm = TRUE),
+      whiff_rate = whiffs / pitches,
+      .groups = "drop"
+    )
+  
+  print(fsfb)  # 👈 print table to debug what’s going into the plot
+  
+  ggplot(fsfb, aes(x = SideBin, y = HeightBin, fill = whiff_rate)) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(labels = scales::percent, option = "C") +
+    labs(
+      title = "4-Seam Fastball Whiff Rate by Location",
+      x = "Strike Zone Side",
+      y = "Strike Zone Height",
+      fill = "Whiff Rate"
+    ) +
+    theme_minimal(base_size = 14)
+}
+
