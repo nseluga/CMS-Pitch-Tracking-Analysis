@@ -21,8 +21,8 @@ clean_rapsodo <- function(file) {
       SwingResult = as.factor(`Swing Result`),
       PitchOutcome = as.factor(`Pitch Outcome`),
       HitterHandedness = as.factor(`Hitter Handedness`),
-      `Strike Zone Side` = as.numeric(`Strike Zone Side`),
-      `Strike Zone Height` = as.numeric(`Strike Zone Height`)
+      `Strike Zone Side` = as.numeric(`Strike Zone Side`) / 12, # Convert to feet
+      `Strike Zone Height` = as.numeric(`Strike Zone Height`) /12 # Convert to feet
     )
 }
 

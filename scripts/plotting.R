@@ -94,60 +94,124 @@ plot_fsfb_whiff_heatmap <- function(data) {
   x_bins <- seq(-2, 2, by = 0.5)
   y_bins <- seq(0, 5, by = 0.5)
   
-  # Full grid
+  # Create full grid of bin centers
   grid <- expand.grid(
     SideMid = head(x_bins, -1) + diff(x_bins)/2,
     HeightMid = head(y_bins, -1) + diff(y_bins)/2
   )
   
-  # Summarize pitch data
+  # Filter and bin the fastball data
   fsfb <- data %>%
     filter(PitchType == "Fastball") %>%
+    # Create whiff flag (1 for whiff, 0 for contact/other)
+    mutate(WhiffFlag = ifelse(PitchOutcome == "Whiff", 1, 0)) %>%
+    # Assign each pitch to a bin
     mutate(
-      WhiffFlag = ifelse(PitchOutcome == "Whiff", 1, 0),
-      SideBin = cut(`Strike Zone Side`, breaks = x_bins, include.lowest = TRUE),
-      HeightBin = cut(`Strike Zone Height`, breaks = y_bins, include.lowest = TRUE)
+      SideBin = cut(`Strike Zone Side`, 
+                    breaks = x_bins, 
+                    include.lowest = TRUE, 
+                    labels = FALSE),
+      HeightBin = cut(`Strike Zone Height`, 
+                      breaks = y_bins, 
+                      include.lowest = TRUE, 
+                      labels = FALSE)
     ) %>%
-    group_by(SideBin, HeightBin) %>%
+    # Remove pitches that fall outside our bins
+    filter(!is.na(SideBin) & !is.na(HeightBin)) %>%
+    # Calculate bin centers
+    mutate(
+      SideMid = x_bins[SideBin] + (x_bins[2] - x_bins[1])/2,
+      HeightMid = y_bins[HeightBin] + (y_bins[2] - y_bins[1])/2
+    ) %>%
+    # Group by bin centers and calculate whiff rate
+    group_by(SideMid, HeightMid) %>%
     summarise(
       pitches = n(),
       whiffs = sum(WhiffFlag, na.rm = TRUE),
       whiff_rate = whiffs / pitches,
       .groups = "drop"
-    ) %>%
-    mutate(
-      SideMid = (as.numeric(sub("\\((.+),.*", "\\1", SideBin)) + 
-                   as.numeric(sub("[^,]*,([^]]*)\\]", "\\1", SideBin)))/2,
-      HeightMid = (as.numeric(sub("\\((.+),.*", "\\1", HeightBin)) + 
-                     as.numeric(sub("[^,]*,([^]]*)\\]", "\\1", HeightBin)))/2
-    ) %>%
-    select(SideMid, HeightMid, whiff_rate, pitches)
+    )
   
-  # Join grid + keep NA for empty bins
+  # Join with full grid to ensure all bins are represented
   fsfb_full <- grid %>%
     left_join(fsfb, by = c("SideMid", "HeightMid"))
   
-  # Plot
-  ggplot(fsfb_full, aes(x = SideMid, y = HeightMid)) +
-    geom_tile(aes(fill = whiff_rate), color = "white") +
-    geom_text(aes(label = ifelse(!is.na(whiff_rate),
+  # Create the heatmap
+  p <- ggplot(fsfb_full, aes(x = SideMid, y = HeightMid)) +
+    geom_tile(aes(fill = whiff_rate), 
+              color = "white", 
+              size = 0.5,
+              width = 0.48,  # Slightly smaller than bin width to show grid
+              height = 0.48) +
+    # Add percentage labels for bins with data
+    geom_text(aes(label = ifelse(!is.na(whiff_rate) & pitches >= 3,  # Only show if 3+ pitches
                                  paste0(round(whiff_rate*100), "%"), "")),
-              size = 3, color = "black") +
+              size = 3, 
+              color = "black",
+              fontface = "bold") +
+    # Add pitch count labels (smaller, below percentage)
+    geom_text(aes(label = ifelse(!is.na(pitches) & pitches >= 3,
+                                 paste0("(n=", pitches, ")"), "")),
+              size = 2, 
+              color = "darkgray",
+              nudge_y = -0.1) +
+    # Color scale
     scale_fill_gradient2(
-      low = "red", mid = "white", high = "blue",
-      midpoint = 0.5, limits = c(0,1),
+      low = "red", 
+      mid = "white", 
+      high = "blue",
+      midpoint = 0.5, 
+      limits = c(0, 1),
       labels = scales::percent,
-      na.value = "grey90"
+      na.value = "grey90",
+      name = "Whiff %"
     ) +
+    # Labels and title
     labs(
       title = "4-Seam Fastball Whiff Rate by Location",
+      subtitle = "Only bins with 3+ pitches are labeled",
       x = "Horizontal Location (ft.)",
-      y = "Vertical Location (ft.)",
-      fill = "Whiff %"
+      y = "Vertical Location (ft.)"
     ) +
+    # Fixed aspect ratio and limits
     coord_fixed(ratio = 1, xlim = c(-2, 2), ylim = c(0, 5)) +
+    # Theme
     theme_minimal(base_size = 14) +
-    theme(panel.grid = element_blank()) +
-    annotate("rect", xmin = -0.83, xmax = 0.83, ymin = 1.5, ymax = 3.5,
-             color = "green", fill = NA, size = 1)
+    theme(
+      panel.grid = element_blank(),
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, color = "gray60"),
+      legend.position = "right"
+    ) +
+    # Strike zone overlay
+    annotate("rect", 
+             xmin = -0.83, xmax = 0.83, 
+             ymin = 1.5, ymax = 3.5,
+             color = "green", 
+             fill = NA, 
+             size = 1)
+  
+  return(p)
+}
+
+# Example usage and debugging function
+debug_whiff_data <- function(data) {
+  # Check your data structure and values
+  cat("Data columns:", names(data), "\n\n")
+  
+  # Check fastball data
+  fsfb_check <- data %>%
+    filter(PitchType == "Fastball")
+  
+  cat("Total fastballs:", nrow(fsfb_check), "\n")
+  cat("Unique PitchOutcomes:", levels(data$PitchOutcome), "\n")
+  cat("Whiff count:", sum(fsfb_check$PitchOutcome == "Whiff", na.rm = TRUE), "\n")
+  
+  # Check location data ranges
+  cat("Strike Zone Side range:", range(data$`Strike Zone Side`, na.rm = TRUE), "\n")
+  cat("Strike Zone Height range:", range(data$`Strike Zone Height`, na.rm = TRUE), "\n")
+  
+  # Sample of data
+  cat("\nSample of fastball data:\n")
+  print(head(fsfb_check %>% select(PitchType, PitchOutcome, `Strike Zone Side`, `Strike Zone Height`)))
 }
