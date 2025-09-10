@@ -194,6 +194,72 @@ plot_fsfb_whiff_heatmap <- function(data) {
   return(p)
 }
 
+# Bar plot putaway% by pitch and handedness
+plot_putaway_by_handedness <- function(data, min_n = 1) {
+  library(dplyr)
+  library(ggplot2)
+  library(scales)
+  library(tidyr)
+  
+  two_strike_counts <- c("0-2", "1-2", "2-2", "3-2")
+  
+  # Mapping long names to abbreviations
+  pitch_abbrev <- c(
+    "Fastball" = "FB",
+    "TwoSeamFastball" = "2S",
+    "CurveBall" = "CB",
+    "Slider" = "SL",
+    "ChangeUp" = "CH",
+    "Cutter" = "CT"
+  )
+  
+  putaway <- data %>%
+    filter(Count %in% two_strike_counts) %>%
+    group_by(PitchType, HitterHandedness) %>%
+    summarise(
+      Total2StrikePitches = n(),
+      Strikeouts = sum(PitchOutcome %in% c("Whiff", "Called Strike"), na.rm = TRUE),
+      PutawayRate = ifelse(n() > 0, Strikeouts / n(), 0),
+      .groups = "drop"
+    ) %>%
+    filter(Total2StrikePitches >= min_n) %>%
+    complete(PitchType, HitterHandedness, fill = list(
+      Total2StrikePitches = 0,
+      Strikeouts = 0,
+      PutawayRate = 0
+    )) %>%
+    mutate(PitchLabel = recode(PitchType, !!!pitch_abbrev))
+  
+  # Order pitches by total usage
+  usage_order <- putaway %>%
+    group_by(PitchLabel) %>%
+    summarise(total_usage = sum(Total2StrikePitches)) %>%
+    arrange(desc(total_usage)) %>%
+    pull(PitchLabel)
+  
+  putaway$PitchLabel <- factor(putaway$PitchLabel, levels = usage_order)
+  
+  ggplot(putaway, aes(x = PitchLabel, y = PutawayRate, fill = HitterHandedness)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+    scale_fill_manual(values = c("LHH" = "#E64B35", "RHH" = "#4DBBD5")) +
+    labs(
+      title = "Putaway% by Pitch Type and Hitter Handedness",
+      subtitle = "Pitch types ordered left to right by total 2-strike usage (most → least)",
+      x = "Pitch Type (abbreviated, ordered by usage)",
+      y = "Putaway%",
+      fill = "Hitter Handedness"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text.x = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 15),
+      plot.subtitle = element_text(hjust = 0.5, size = 11)
+    )
+}
+
 # Example usage and debugging function
 debug_whiff_data <- function(data) {
   # Check your data structure and values
