@@ -92,7 +92,7 @@ plot_fsfb_whiff_heatmap <- function(data) {
   
   # Define bin edges
   x_bins <- seq(-2, 2, by = 0.5)
-  y_bins <- seq(0, 5, by = 0.5)
+  y_bins <- seq(0, 5, by = 0.5)  # Changed to start at 0 (ground level)
   
   # Create full grid of bin centers
   grid <- expand.grid(
@@ -144,22 +144,22 @@ plot_fsfb_whiff_heatmap <- function(data) {
               width = 0.48,  # Slightly smaller than bin width to show grid
               height = 0.48) +
     # Add percentage labels for bins with data
-    geom_text(aes(label = ifelse(!is.na(whiff_rate) & pitches >= 3,  # Only show if 3+ pitches
+    geom_text(aes(label = ifelse(!is.na(whiff_rate) & pitches >= 1,  # Only show if 1+ pitches
                                  paste0(round(whiff_rate*100), "%"), "")),
               size = 3, 
               color = "black",
               fontface = "bold") +
     # Add pitch count labels (smaller, below percentage)
-    geom_text(aes(label = ifelse(!is.na(pitches) & pitches >= 3,
+    geom_text(aes(label = ifelse(!is.na(pitches) & pitches >= 1,
                                  paste0("(n=", pitches, ")"), "")),
               size = 2, 
               color = "darkgray",
               nudge_y = -0.1) +
-    # Color scale
+    # Color scale - Red for high whiff%, blue for low whiff%
     scale_fill_gradient2(
-      low = "red", 
+      low = "blue",    # 0% whiff rate
       mid = "white", 
-      high = "blue",
+      high = "red",    # 100% whiff rate
       midpoint = 0.5, 
       limits = c(0, 1),
       labels = scales::percent,
@@ -169,11 +169,11 @@ plot_fsfb_whiff_heatmap <- function(data) {
     # Labels and title
     labs(
       title = "4-Seam Fastball Whiff Rate by Location",
-      subtitle = "Only bins with 3+ pitches are labeled",
+      subtitle = "Only bins with 1+ swings are labeled (Behind plate view)",
       x = "Horizontal Location (ft.)",
-      y = "Vertical Location (ft.)"
+      y = "Vertical Location (ft. above ground)"
     ) +
-    # Fixed aspect ratio and limits
+    # Fixed aspect ratio and limits - CORRECTED for ground level
     coord_fixed(ratio = 1, xlim = c(-2, 2), ylim = c(0, 5)) +
     # Theme
     theme_minimal(base_size = 14) +
@@ -183,10 +183,10 @@ plot_fsfb_whiff_heatmap <- function(data) {
       plot.subtitle = element_text(hjust = 0.5, color = "gray60"),
       legend.position = "right"
     ) +
-    # Strike zone overlay
+    # Strike zone overlay - CORRECTED positions
     annotate("rect", 
              xmin = -0.83, xmax = 0.83, 
-             ymin = 1.5, ymax = 3.5,
+             ymin = 1.5, ymax = 3.5,      # Typical strike zone height above ground
              color = "green", 
              fill = NA, 
              size = 1)
@@ -209,9 +209,28 @@ debug_whiff_data <- function(data) {
   
   # Check location data ranges
   cat("Strike Zone Side range:", range(data$`Strike Zone Side`, na.rm = TRUE), "\n")
-  cat("Strike Zone Height range:", range(data$`Strike Zone Height`, na.rm = TRUE), "\n")
+  cat("Strike Zone Height range:", range(data$`Strike Zone Height`, na.rm = TRUE), "\n\n")
   
-  # Sample of data
-  cat("\nSample of fastball data:\n")
-  print(head(fsfb_check %>% select(PitchType, PitchOutcome, `Strike Zone Side`, `Strike Zone Height`)))
+  # Show ALL individual fastball entries (instead of just head())
+  cat("ALL FASTBALL ENTRIES:\n")
+  cat("====================\n")
+  
+  # Select key columns and print each row
+  fastball_details <- fsfb_check %>% 
+    select(PitchType, PitchOutcome, `Strike Zone Side`, `Strike Zone Height`, Velocity, TotalSpin) %>%
+    mutate(row_number = row_number())
+  
+  print(fastball_details)
+  
+  # Optional: Also show just the whiffs separately
+  whiff_entries <- fsfb_check %>%
+    filter(PitchOutcome == "Whiff") %>%
+    select(PitchType, PitchOutcome, `Strike Zone Side`, `Strike Zone Height`, Velocity, TotalSpin) %>%
+    mutate(row_number = row_number())
+  
+  cat("\n\nWHIFF ENTRIES ONLY:\n")
+  cat("==================\n")
+  print(whiff_entries)
+  
+  return(invisible(fsfb_check))  # Return the fastball data invisibly for further inspection
 }
